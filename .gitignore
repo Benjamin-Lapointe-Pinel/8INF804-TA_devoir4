@@ -1,5 +1,3 @@
-*.pdf
-
 # Format
 .clang-format
 
@@ -38,3 +36,4 @@ tags
 *.exe
 *.out
 *.app
+lossless-codec
