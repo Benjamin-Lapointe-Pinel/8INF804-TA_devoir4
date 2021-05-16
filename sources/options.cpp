@@ -42,8 +42,7 @@ namespace {
     ;
 
    compression.add_options()
-    ("predictor,p",boost::program_options::value<std::string>(),
-     "followed by 0 (default), png, jpeg, jpeg-ls, paeth, average, median, or super-s")
+    ("predictor,p",boost::program_options::value<std::string>(), "followed by 0 (default), A, B, C")
     ("compress,c","Compresses a pnm file and produces a .s file (default)")
     ("decompress,d","Decompresses a .s file and procudes a .pnm")
     ;
@@ -160,15 +159,14 @@ options::options(int argc, const char * const argv[])
    {
     switch (hash(vm["predictor"].as<std::string>() ))
      {
-     case hash("X"):       predictor=predictor_type::X;    break; // change meee!!!
-
-
-      default:
-       throw boost::program_options::error("unknown predictor "+vm["predictor"].as<std::string>());
+       case hash("A"): predictor = predictor_type::A; break;
+       case hash("B"): predictor = predictor_type::B; break;
+       case hash("C"): predictor = predictor_type::C; break;
+       default: throw boost::program_options::error("unknown predictor " + vm["predictor"].as<std::string>());
      }
    }
   else
-   predictor=predictor_type::X; // CHANGE MEEE!!
+   predictor=predictor_type::A;
 
   compress=!vm.count("decompress");
 

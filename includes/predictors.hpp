@@ -4,7 +4,9 @@
 enum class predictor_type
   {
    none,       // invalide
-   X           // CHANGE MEEEE
+	 A,
+	 B,
+	 C
   };
 
 

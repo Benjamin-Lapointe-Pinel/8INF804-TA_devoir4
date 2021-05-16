@@ -1,65 +1,42 @@
-NAME=lossless-codec
+MAKEFLAGS+=-j
+NAME=a.out
+SOURCES=$(wildcard sources/*.cpp)
+OBJECTS=$(SOURCES:.cpp=.o)
+DEPENDS=$(OBJECTS:.o=.d)
+INCLUDES=-I. -Iincludes/
+LIBRARIES=-lboost_program_options -lstdc++fs
+CXXFLAGS=$(INCLUDES) $(LIBRARIES) -W -Wall -Wextra -Wno-unused-function
 
-# since $(NAME) isn't an object nor
-# a file until it's created:
-#.DEFAULT_GOAL := $(NAME)
+.PHONY: release debug build rebuild tags lint clean
 
-# enable full parallelism (because I can)
-MAKEFLAGS+= -j
+debug: CXXFLAGS+=-g
+debug: build tags
 
-# but first rule is the .DEFAULT_GOAL
-all: $(NAME)
+release: CXXFLAGS+=-O3
+release: rebuild
 
+build: $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $? -o $(NAME)
 
-# $(wildcard dir1/*.cpp)
-SOURCES= \
-	$(wildcard sources/*.cpp)
+%.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
+rebuild:
+	$(MAKE) clean
+	$(MAKE) build
 
-DEFINES=\
-	-D__PROGNAME__=lossless-codec \
-	-D__PROGVER__=0.5
+# Verify if programs are present:
+# if which dot 1>/dev/null; then echo allo; fi (TODO also redirect stderr)
+tags:
+	ctags -R
 
-INCLUDES=-I. -I./includes/ -I./plugins -I/usr/include/boost/
-
-CXXFLAGS= \
-	-fwhole-program -flto \
-	-O3 \
-	-std=c++11 \
-	-W \
-	-Wall -Wextra -Wfatal-errors \
-	$(DEFINES) \
-	$(INCLUDES)
-
-LDFLAGS=
-
-LIBS  = -lboost_program_options -lstdc++fs
-
-OBJS=$(SOURCES:.cpp=.o)
-
--include .depend
-
-count_files=$(shell cut -d: -f 2- .depend | tr ' ' "\n" | sort -u )
-
-depend:
-	@./make-depend.py "$(INCLUDES)" "$(SOURCES)" > .depend
-
-$(NAME): $(OBJS)
-	g++ $(OBJS) $(LDFLAGS) -o $(NAME) $(LIBS)
+lint: $(SOURCES)
+	clang-tidy -header-filter=.* $? -- $(CXXFLAGS) $(INCLUDES)
 
 clean:
-	@rm -v $(OBJS)
-	@rm -v .depend
+	rm -f *.d $(DEPENDS)
+	rm -f *.o $(OBJECTS)
+	rm -f *.out $(NAME)
+	rm -f tags
 
-# counts "real" lines of code
-count:
-	@echo full:
-	@wc -l $(count_files)
-	@echo useful: $(shell \
-	grep -v \
-	-e "^[ ]*//" \
-	-e "^[ ]*$$" \
-	-e "^[ ]*{[ ]*$$" \
-	-e "^[ ]*}[ ]*$$" \
-	$(count_files) | wc -l )
-
+-include $(DEPENDS)
