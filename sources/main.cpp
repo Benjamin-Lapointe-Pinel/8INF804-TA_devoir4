@@ -1,9 +1,12 @@
+#include <bitset>
 #include <iostream>
 #include <list>
+#include <map>
 
-#include <bitmap.hpp>
-#include <options.hpp>
-#include <pixel.hpp>
+#include "bitmap.hpp"
+#include "huffman_tree.hpp"
+#include "options.hpp"
+#include "pixel.hpp"
 
 void quantize(RGB &rgb)
 {
@@ -33,12 +36,29 @@ void compress_a(const bitmap<RGB> &input, bitmap<RGB> &deltas)
     RGB prediction = reconstructed.linear_pixel(i - 1);
     RGB delta = original - prediction;
 
-		quantize(delta);
+    quantize(delta);
     deltas.linear_pixel(i) = delta;
 
-		dequantize(delta);
+    dequantize(delta);
     reconstructed.linear_pixel(i) = prediction + delta;
   }
+
+  huffman_tree_factory<uint8_t> htf;
+  for (size_t i = 0; i < deltas.size(); i++)
+  {
+    RGB pixel = deltas.linear_pixel(i);
+    for (size_t j = 0; j < 3; j++)
+    {
+      htf.inc_frequency(pixel[i]);
+    }
+  }
+
+  auto ht = htf.create();
+  for (unsigned i = 0; i < 256; i++)
+  {
+    std::cout << std::bitset<8>(i) << ' ' << (unsigned)ht->get_symbol(i) << std::endl;
+  }
+  delete ht;
 }
 
 void decompress_a(const bitmap<RGB> &deltas, bitmap<RGB> &output)
@@ -51,7 +71,7 @@ void decompress_a(const bitmap<RGB> &deltas, bitmap<RGB> &output)
     RGB prediction = output.linear_pixel(i - 1);
     RGB delta = deltas.linear_pixel(i);
 
-		dequantize(delta);
+    dequantize(delta);
     output.linear_pixel(i) = prediction + delta;
   }
 }
