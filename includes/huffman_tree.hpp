@@ -1,120 +1,98 @@
-
 #ifndef HUFFMAN_TREE
 #define HUFFMAN_TREE
 
 template <typename P> class huffman_tree_factory
 {
-private:
-  std::map<P, unsigned> symbol_frequency;
-
 public:
   class huffman_tree
   {
-  private:
-    struct node
+  public:
+    class node
     {
-      P symbol;
-      unsigned frequency;
-      node *left;
-      node *right;
+    private:
+      P symbol = P();
+      unsigned frequency = 1;
+      unsigned depth = 0;
+      unsigned code = 0;
+      node *left = NULL;
+      node *right = NULL;
 
+      void update_children(uint8_t direction)
+      {
+        depth++;
+        code <<= 1;
+        code |= direction;
+
+        if (left)
+        {
+          left->update_children(direction);
+        }
+        if (right)
+        {
+          right->update_children(direction);
+        }
+      }
+
+    public:
       bool is_leaf() const
       {
         return (left == NULL) && (right == NULL);
       }
 
-      node(P symbol_, unsigned frequency_) : node(symbol_, frequency_, NULL, NULL)
+      void inc_frequency()
+      {
+        frequency++;
+      }
+
+      unsigned get_frequency() const
+      {
+        return frequency;
+      }
+
+      unsigned get_depth() const
+      {
+        return depth;
+      }
+
+      unsigned get_code() const
+      {
+        return code;
+      }
+
+      node(P symbol_) : symbol(symbol_)
       {
       }
 
-      node(unsigned frequency_, node *left_, node *right_) : node(P(), frequency_, left_, right_)
+      node(node *left_, node *right_) : left(left_), right(right_)
       {
-      }
-
-      node(P symbol_, unsigned frequency_, node *left_, node *right_)
-        : symbol(symbol_), frequency(frequency_), left(left_), right(right_)
-      {
+        frequency = left->get_frequency() + right->get_frequency();
+        left->update_children(0);
+        right->update_children(1);
       }
     };
 
-    node *root;
-
-    /* P get_symbol(unsigned &code, node *n) const */
-    /* { */
-    /*   if (n->is_leaf()) */
-    /*   { */
-    /*     return n->symbol; */
-    /*   } */
-
-    /*   unsigned direction = code & 1; */
-    /*   code >>= 1; */
-    /*   if (direction) */
-    /*   { */
-    /*     if (n->left) */
-    /*     { */
-    /*       return get_symbol(code, n->left); */
-    /*     } */
-    /*   } */
-    /*   else */
-    /*   { */
-    /*     if (n->right) */
-    /*     { */
-    /*       return get_symbol(code, n->right); */
-    /*     } */
-    /*   } */
-			
-			/* return 0; */
-			/* /1* throw std::out_of_range ("blah"); *1/ */
-    /* } */
-
-		/* unsigned get_code(P symbol, unsigned &code, node* n) const */
-		/* { */
-    /*   if (n->is_leaf()) */
-    /*   { */
-    /*     if ( symbol == n->symbol) */
-				/* { */
-					/* return code; */
-				/* } */
-				/* else */
-				/* { */
-					/* /1* throw error; *1/ */
-				/* } */
-    /*   } */
-		/* } */
-
-  public:
-    /* P get_symbol(unsigned code) const */
-    /* { */
-    /*   return get_symbol(code, root); */
-    /* } */
-
-		/* unsigned get_code(P symbol) const */
-		/* { */
-			/* unsigned code = 0; */
-			/* return get_code(symbol, node); */
-		/* } */
-
-    huffman_tree(std::map<P, unsigned> symbol_frequency)
+    huffman_tree(std::map<P, node *> symbol_node) : leaves(symbol_node)
     {
-      std::multimap<unsigned, node *> nodes;
-      for (auto &p : symbol_frequency)
+      std::multimap<unsigned, node *> frequency_nodes;
+      for (auto &p : symbol_node)
       {
-        nodes.insert(std::pair<unsigned, node *>(p.second, new node(p.first, p.second)));
+        node *n = p.second;
+        frequency_nodes.insert(std::pair<unsigned, node *>(n->get_frequency(), n));
       }
 
-      while (nodes.size() > 1)
+      while (frequency_nodes.size() > 1)
       {
-        auto it = nodes.begin();
+        auto it = frequency_nodes.begin();
         node *l = it->second;
-        nodes.erase(it);
-        it = nodes.begin();
+        frequency_nodes.erase(it);
+        it = frequency_nodes.begin();
         node *r = it->second;
-        nodes.erase(it);
+        frequency_nodes.erase(it);
 
-        node *n = new node(l->frequency + r->frequency, l, r);
-        nodes.insert(std::pair<unsigned, node *>(n->frequency, n));
+        node *n = new node(l, r);
+        frequency_nodes.insert(std::pair<unsigned, node *>(n->get_frequency(), n));
       }
-      root = nodes.begin()->second;
+      root = frequency_nodes.begin()->second;
     }
 
     ~huffman_tree()
@@ -124,24 +102,59 @@ public:
 
     friend std::ostream &operator<<(std::ostream &os, const huffman_tree &ht)
     {
-      /* return os << *(ht.root); */
+      for (auto &p : ht.get_leaves())
+      {
+        node *n = p.second;
+        unsigned code = n->get_code();
+
+        os << (unsigned)p.first << ' ';
+        for (size_t i = 0; i < n->get_depth(); i++)
+        {
+          if (code & 1)
+          {
+            os << '1';
+          }
+          else
+          {
+            os << '0';
+          }
+          code >>= 1;
+        }
+        os << std::endl;
+      }
+      return os;
     }
+
+    std::map<P, node *> get_leaves() const
+    {
+      return leaves;
+    }
+
+  private:
+    node *root;
+    std::map<P, node *> leaves;
   };
 
   void inc_frequency(P symbol)
   {
-    symbol_frequency[symbol]++;
+    if (symbol_node[symbol])
+    {
+      symbol_node[symbol]->inc_frequency();
+    }
+    else
+    {
+      symbol_node[symbol] = new huffman_tree_node(symbol);
+    }
   }
 
   huffman_tree *create()
   {
-    return create(symbol_frequency);
+    return new huffman_tree(symbol_node);
   }
 
-  huffman_tree *create(std::map<P, unsigned> symbol_frequency)
-  {
-    return new huffman_tree(symbol_frequency);
-  }
+private:
+  typedef typename huffman_tree_factory<P>::huffman_tree::node huffman_tree_node;
+  std::map<P, huffman_tree_node *> symbol_node;
 };
 
 #endif

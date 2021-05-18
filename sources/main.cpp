@@ -54,10 +54,7 @@ void compress_a(const bitmap<RGB> &input, bitmap<RGB> &deltas)
   }
 
   auto ht = htf.create();
-  for (unsigned i = 0; i < 256; i++)
-  {
-    std::cout << std::bitset<8>(i) << ' ' << (unsigned)ht->get_symbol(i) << std::endl;
-  }
+	std::cout << *ht;
   delete ht;
 }
 
