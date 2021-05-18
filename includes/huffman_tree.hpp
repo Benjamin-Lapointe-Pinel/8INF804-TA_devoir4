@@ -69,6 +69,18 @@ public:
         left->update_children(0);
         right->update_children(1);
       }
+
+      ~node()
+      {
+        if (left)
+        {
+          delete left;
+        }
+        if (right)
+        {
+          delete right;
+        }
+      }
     };
 
     huffman_tree(std::map<P, node *> symbol_node) : leaves(symbol_node)
@@ -97,7 +109,7 @@ public:
 
     ~huffman_tree()
     {
-      // TODO
+      delete root;
     }
 
     friend std::ostream &operator<<(std::ostream &os, const huffman_tree &ht)
