@@ -58,28 +58,28 @@ void compress_a(const std::string &filepath, const std::string &archivepath)
 
   std::ofstream archive;
   archive.open(archivepath, std::ios::binary);
-	uint8_t b = 0;
-	size_t index = 0;
+  uint64_t b = 0;
+  size_t index = 0;
   for (size_t i = 0; i < deltas.size(); i++)
   {
     RGB pixel = deltas.linear_pixel(i);
     for (size_t j = 0; j < 3; j++)
     {
-			auto n = ht->get_leaf(pixel[j]);
-			unsigned code = n.get_code();
-			for (size_t k = 0; k < n.get_code_length(); k++)
-			{
-				b <<= 1;
-				b |= code & 1;
-				code >>= 1;
-				index++;
+      auto n = ht->get_leaf(pixel[j]);
+      unsigned code = n.get_code();
+      for (size_t k = 0; k < n.get_code_length(); k++)
+      {
+        b <<= 1;
+        b |= code & 1;
+        code >>= 1;
+        index++;
 
-				if (index == sizeof(b) * CHAR_BIT)
-				{
-					archive << b;
-					index = 0;
-				}
-			}
+        if (index == sizeof(b) * CHAR_BIT)
+        {
+          archive.write(reinterpret_cast<const char *>(&b), sizeof(b));
+          index = 0;
+        }
+      }
     }
   }
   archive.close();
