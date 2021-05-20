@@ -19,9 +19,9 @@ public:
 
       void update_children(uint8_t direction)
       {
-        depth++;
         code <<= 1;
-        code |= direction;
+        code |= direction & 1;
+        depth++;
 
         if (left)
         {
@@ -49,7 +49,7 @@ public:
         return frequency;
       }
 
-      unsigned get_depth() const
+      unsigned get_code_length() const
       {
         return depth;
       }
@@ -120,7 +120,7 @@ public:
         unsigned code = n->get_code();
 
         os << (unsigned)p.first << ' ';
-        for (size_t i = 0; i < n->get_depth(); i++)
+        for (size_t i = 0; i < n->get_code_length(); i++)
         {
           if (code & 1)
           {
@@ -141,6 +141,11 @@ public:
     {
       return leaves;
     }
+
+		const node& get_leaf(P symbol) const
+		{
+			return *get_leaves()[symbol];
+		}
 
   private:
     node *root;
