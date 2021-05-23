@@ -1,6 +1,4 @@
-#include <bitset>
 #include <iostream>
-#include <list>
 #include <map>
 
 #include "bitmap.hpp"
@@ -58,7 +56,28 @@ void compress_a(const std::string &filepath, const std::string &archivepath)
 
   std::ofstream archive;
   archive.open(archivepath, std::ios::binary);
-  uint64_t b = 0;
+
+  // header
+  char predictor = 0;
+  size_t width = deltas.width();
+  size_t height = deltas.height();
+  archive.write(reinterpret_cast<const char *>(&predictor), sizeof(predictor));
+  archive.write(reinterpret_cast<const char *>(&width), sizeof(width));
+  archive.write(reinterpret_cast<const char *>(&height), sizeof(height));
+
+  // huffman tree
+  size_t ht_size = ht->get_leaves().size();
+  archive.write(reinterpret_cast<const char *>(&ht_size), sizeof(ht_size));
+  for (const auto &l : ht->get_leaves())
+  {
+    auto symbol = l.first;
+    auto frequency = l.second->get_frequency();
+    archive.write(reinterpret_cast<const char *>(&symbol), sizeof(symbol));
+    archive.write(reinterpret_cast<const char *>(&frequency), sizeof(frequency));
+  }
+
+  // variable encoding
+  unsigned char b = 0;
   size_t index = 0;
   for (size_t i = 0; i < deltas.size(); i++)
   {
@@ -74,7 +93,7 @@ void compress_a(const std::string &filepath, const std::string &archivepath)
         code >>= 1;
         index++;
 
-        if (index == sizeof(b) * CHAR_BIT)
+        if (index == CHAR_BIT)
         {
           archive.write(reinterpret_cast<const char *>(&b), sizeof(b));
           index = 0;
@@ -82,25 +101,78 @@ void compress_a(const std::string &filepath, const std::string &archivepath)
       }
     }
   }
-  archive.close();
 
+  archive.close();
   delete ht;
 }
 
-/* void decompress_a(const bitmap<RGB> &deltas) */
-/* { */
-/*   // bootstrap */
-/*   output.linear_pixel(0) = deltas.linear_pixel(0); */
+void decompress(const std::string &archivepath, const std::string &filepath)
+{
+  std::ifstream archive(archivepath, std::ios::binary);
 
-/*   for (size_t i = 1; i < deltas.size(); i++) */
-/*   { */
-/*     RGB prediction = output.linear_pixel(i - 1); */
-/*     RGB delta = deltas.linear_pixel(i); */
+  // header
+  char predictor;
+  size_t width;
+  size_t height;
+  archive.read((char *)&predictor, sizeof(predictor));
+  archive.read((char *)&width, sizeof(width));
+  archive.read((char *)&height, sizeof(height));
+  bitmap<RGB> deltas(width, height);
 
-/*     dequantize(delta); */
-/*     output.linear_pixel(i) = prediction + delta; */
-/*   } */
-/* } */
+  // huffman tree
+  size_t ht_size;
+  archive.read((char *)&ht_size, sizeof(ht_size));
+
+  huffman_tree_factory<uint8_t> htf;
+  for (size_t i = 0; i < ht_size; i++)
+  {
+    uint8_t symbol;
+    unsigned frequency;
+    archive.read((char *)&symbol, sizeof(symbol));
+    archive.read((char *)&frequency, sizeof(frequency));
+    htf.set_frequency(symbol, frequency);
+  }
+  auto ht = htf.create();
+
+  // variable decoding
+  unsigned char buffer;
+  size_t buffer_index = 0;
+  auto n = ht->get_root();
+  for (size_t i = 0; i < deltas.size(); i++)
+  {
+    RGB& pixel = deltas.linear_pixel(i);
+    for (size_t j = 0; j < 3; j++)
+    {
+      while (!n->is_leaf())
+      {
+        if (buffer_index == 0)
+        {
+          archive.read((char *)&buffer, sizeof(buffer));
+					buffer_index = CHAR_BIT;
+        }
+        n = n->get_child((buffer >> (buffer_index - 1)) & 1);
+        buffer_index--;
+      }
+      pixel[j] = n->get_symbol();
+      n = ht->get_root();
+    }
+  }
+  delete ht;
+	archive.close();
+
+  // bootstrap
+  bitmap<RGB> output(deltas.width(), deltas.height());
+  output.linear_pixel(0) = deltas.linear_pixel(0);
+  for (size_t i = 1; i < deltas.size(); i++)
+  {
+    RGB prediction = output.linear_pixel(i - 1);
+    RGB delta = deltas.linear_pixel(i);
+
+    dequantize(delta);
+    output.linear_pixel(i) = prediction + delta;
+  }
+	output.save(filepath);
+}
 
 int main(int argc, char *argv[])
 {
@@ -112,12 +184,8 @@ int main(int argc, char *argv[])
     {
       case 0: options::show_help(); break;
       case 1: options::show_version(); break;
-      case 2:
-        {
-          compress_a(opt.input, opt.output);
-        }
-        break;
-      default: break; // IMPLEMENT MEEEE
+      case 2: compress_a(opt.input, opt.output); break;
+      default: decompress(opt.input, opt.output); break;
     }
   }
   catch (boost::program_options::error &this_exception)

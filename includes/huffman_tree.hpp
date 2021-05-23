@@ -1,6 +1,8 @@
 #ifndef HUFFMAN_TREE
 #define HUFFMAN_TREE
 
+#include <climits>
+
 template <typename P> class huffman_tree_factory
 {
 public:
@@ -17,7 +19,7 @@ public:
       node *left = NULL;
       node *right = NULL;
 
-      void update_children(uint8_t direction)
+      void update_children(bool direction)
       {
         code <<= 1;
         code |= direction & 1;
@@ -39,9 +41,31 @@ public:
         return (left == NULL) && (right == NULL);
       }
 
+      const node *get_child(bool direction) const
+      {
+        if (direction)
+        {
+          return right;
+        }
+        else
+        {
+          return left;
+        }
+      }
+
       void inc_frequency()
       {
         frequency++;
+      }
+
+      P get_symbol() const
+      {
+        return symbol;
+      }
+
+      void set_frequency(unsigned f)
+      {
+        frequency = f;
       }
 
       unsigned get_frequency() const
@@ -142,10 +166,15 @@ public:
       return leaves;
     }
 
-		const node& get_leaf(P symbol) const
-		{
-			return *get_leaves()[symbol];
-		}
+    const node &get_leaf(P symbol) const
+    {
+      return *get_leaves()[symbol];
+    }
+
+    const node *get_root() const
+    {
+      return root;
+    }
 
   private:
     node *root;
@@ -162,6 +191,15 @@ public:
     {
       symbol_node[symbol] = new huffman_tree_node(symbol);
     }
+  }
+
+  void set_frequency(P symbol, unsigned frequency)
+  {
+    if (!symbol_node[symbol])
+    {
+      symbol_node[symbol] = new huffman_tree_node(symbol);
+    }
+    symbol_node[symbol]->set_frequency(frequency);
   }
 
   huffman_tree *create()
