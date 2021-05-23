@@ -3,25 +3,15 @@
 #include "huffman_tree.hpp"
 #include "pixel.hpp"
 
-void quantize(RGB &rgb)
-{
-  rgb.r /= 1;
-  rgb.g /= 1;
-  rgb.b /= 1;
-}
+void compress_c(const bitmap<RGB> &input, bitmap<RGB> &deltas)
+{}
 
-void dequantize(RGB &rgb)
-{
-  rgb.r *= 1;
-  rgb.g *= 1;
-  rgb.b *= 1;
-}
+void compress_b(const bitmap<RGB> &input, bitmap<RGB> &deltas)
+{}
 
-void compress(const std::string &filepath, const std::string &archivepath, predictor_type predictor)
+void compress_a(const bitmap<RGB> &input, bitmap<RGB> &deltas)
 {
-  bitmap<RGB> input(filepath);
   bitmap<RGB> reconstructed(input.width(), input.height());
-  bitmap<RGB> deltas(input.width(), input.height());
 
   // bootstrap
   reconstructed.linear_pixel(0) = input.linear_pixel(0);
@@ -33,11 +23,40 @@ void compress(const std::string &filepath, const std::string &archivepath, predi
     RGB prediction = reconstructed.linear_pixel(i - 1);
     RGB delta = original - prediction;
 
-    quantize(delta);
     deltas.linear_pixel(i) = delta;
-
-    dequantize(delta);
     reconstructed.linear_pixel(i) = prediction + delta;
+  }
+}
+
+void decompress_c(const bitmap<RGB> &deltas, bitmap<RGB> &output)
+{}
+
+void decompress_b(const bitmap<RGB> &deltas, bitmap<RGB> &output)
+{}
+
+void decompress_a(const bitmap<RGB> &deltas, bitmap<RGB> &output)
+{
+  // bootstrap
+  output.linear_pixel(0) = deltas.linear_pixel(0);
+  for (size_t i = 1; i < deltas.size(); i++)
+  {
+    RGB prediction = output.linear_pixel(i - 1);
+    RGB delta = deltas.linear_pixel(i);
+
+    output.linear_pixel(i) = prediction + delta;
+  }
+}
+
+void compress(const std::string &filepath, const std::string &archivepath, predictor_type predictor)
+{
+  bitmap<RGB> input(filepath);
+  bitmap<RGB> deltas(input.width(), input.height());
+  switch (predictor)
+  {
+    case predictor_type::A: compress_a(input, deltas); break;
+    case predictor_type::B: compress_b(input, deltas); break;
+    case predictor_type::C: compress_c(input, deltas); break;
+    default: throw std::runtime_error("Unsupported predictor."); break;
   }
 
   huffman_tree_factory<uint8_t> htf;
@@ -156,16 +175,13 @@ void decompress(const std::string &archivepath, const std::string &filepath)
   delete ht;
   archive.close();
 
-  // bootstrap
   bitmap<RGB> output(deltas.width(), deltas.height());
-  output.linear_pixel(0) = deltas.linear_pixel(0);
-  for (size_t i = 1; i < deltas.size(); i++)
+  switch (predictor)
   {
-    RGB prediction = output.linear_pixel(i - 1);
-    RGB delta = deltas.linear_pixel(i);
-
-    dequantize(delta);
-    output.linear_pixel(i) = prediction + delta;
+    case predictor_type::A: decompress_a(deltas, output); break;
+    case predictor_type::B: decompress_b(deltas, output); break;
+    case predictor_type::C: decompress_c(deltas, output); break;
+    default: throw std::runtime_error("Unsupported predictor."); break;
   }
   output.save(filepath);
 }
