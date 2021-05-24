@@ -3,11 +3,140 @@
 #include "huffman_tree.hpp"
 #include "pixel.hpp"
 
-void compress_c(const bitmap<RGB> &input, bitmap<RGB> &deltas)
-{}
+void quantize(RGB &rgb)
+{
+  rgb.r /= 1;
+  rgb.g /= 1;
+  rgb.b /= 1;
+}
 
-void compress_b(const bitmap<RGB> &input, bitmap<RGB> &deltas)
-{}
+void dequantize(RGB &rgb)
+{
+  rgb.r *= 1;
+  rgb.g *= 1;
+  rgb.b *= 1;
+}
+
+void compress_c(const bitmap<RGB> &input, bitmap<RGB> &deltas)
+{
+}
+
+void decompress_c(const bitmap<RGB> &deltas, bitmap<RGB> &output)
+{
+}
+
+void compress_b_x_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB> &reconstructed,
+                       const size_t block_size)
+{
+  const size_t half_block_size = block_size / 2;
+  for (size_t x = half_block_size; x < input.width(); x += block_size)
+  {
+    for (size_t y = 0; y < input.height(); y += block_size)
+    {
+      RGB original = input.pixel(x, y);
+      RGB prediction = reconstructed.pixel(x - half_block_size, y);
+      RGB delta = original - prediction;
+
+      quantize(delta);
+      deltas.pixel(x, y) = delta;
+
+      dequantize(delta);
+      reconstructed.pixel(x, y) = prediction + delta;
+    }
+  }
+}
+
+void compress_b_y_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB> &reconstructed,
+                       const size_t block_size)
+{
+  const size_t half_block_size = block_size / 2;
+  for (size_t x = 0; x < input.width(); x += block_size)
+  {
+    for (size_t y = half_block_size; y < input.height(); y += block_size)
+    {
+      RGB original = input.pixel(x, y);
+      RGB prediction = reconstructed.pixel(x, y - half_block_size);
+      RGB delta = original - prediction;
+
+      quantize(delta);
+      deltas.pixel(x, y) = delta;
+
+      dequantize(delta);
+      reconstructed.pixel(x, y) = prediction + delta;
+    }
+  }
+}
+
+void compress_b(const bitmap<RGB> &input, bitmap<RGB> &deltas, size_t block_size = 4)
+{
+  bitmap<RGB> reconstructed(input.width(), input.height());
+
+  // bootstrap
+  for (size_t x = 0; x < input.width(); x += block_size)
+  {
+    for (size_t y = 0; y < input.height(); y += block_size)
+    {
+      deltas.pixel(x, y) = input.pixel(x, y);
+      reconstructed.pixel(x, y) = input.pixel(x, y);
+    }
+  }
+
+  for (size_t i = block_size; i >= 2; i /= 2)
+  {
+    compress_b_x_pass(input, deltas, reconstructed, i);
+    compress_b_y_pass(input, deltas, reconstructed, i);
+  }
+}
+
+void decompress_b_x_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const size_t block_size)
+{
+  const size_t half_block_size = block_size / 2;
+  for (size_t x = half_block_size; x < output.width(); x += block_size)
+  {
+    for (size_t y = 0; y < output.height(); y += block_size)
+    {
+      RGB prediction = output.pixel(x - half_block_size, y);
+      RGB delta = deltas.pixel(x, y);
+
+      dequantize(delta);
+      output.pixel(x, y) = prediction + delta;
+    }
+  }
+}
+
+void decompress_b_y_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const size_t block_size)
+{
+  const size_t half_block_size = block_size / 2;
+  for (size_t x = 0; x < output.width(); x += block_size)
+  {
+    for (size_t y = half_block_size; y < output.height(); y += block_size)
+    {
+      RGB prediction = output.pixel(x, y - half_block_size);
+      RGB delta = deltas.pixel(x, y);
+
+      dequantize(delta);
+      output.pixel(x, y) = prediction + delta;
+    }
+  }
+}
+
+void decompress_b(const bitmap<RGB> &deltas, bitmap<RGB> &output, size_t block_size = 4)
+{
+  // bootstrap
+  for (size_t x = 0; x < output.width(); x += block_size)
+  {
+    for (size_t y = 0; y < output.height(); y += block_size)
+    {
+      output.pixel(x, y) = deltas.pixel(x, y);
+    }
+  }
+
+  for (size_t i = block_size; i >= 2; i /= 2)
+  {
+    decompress_b_x_pass(deltas, output, i);
+    decompress_b_y_pass(deltas, output, i);
+  }
+}
 
 void compress_a(const bitmap<RGB> &input, bitmap<RGB> &deltas)
 {
@@ -23,26 +152,25 @@ void compress_a(const bitmap<RGB> &input, bitmap<RGB> &deltas)
     RGB prediction = reconstructed.linear_pixel(i - 1);
     RGB delta = original - prediction;
 
+    quantize(delta);
     deltas.linear_pixel(i) = delta;
+
+    dequantize(delta);
     reconstructed.linear_pixel(i) = prediction + delta;
   }
 }
-
-void decompress_c(const bitmap<RGB> &deltas, bitmap<RGB> &output)
-{}
-
-void decompress_b(const bitmap<RGB> &deltas, bitmap<RGB> &output)
-{}
 
 void decompress_a(const bitmap<RGB> &deltas, bitmap<RGB> &output)
 {
   // bootstrap
   output.linear_pixel(0) = deltas.linear_pixel(0);
+
   for (size_t i = 1; i < deltas.size(); i++)
   {
     RGB prediction = output.linear_pixel(i - 1);
     RGB delta = deltas.linear_pixel(i);
 
+    dequantize(delta);
     output.linear_pixel(i) = prediction + delta;
   }
 }
