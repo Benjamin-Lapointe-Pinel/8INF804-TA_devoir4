@@ -25,7 +25,7 @@ void decompress_c(const bitmap<RGB> &deltas, bitmap<RGB> &output)
 {
 }
 
-void compress_b_x_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB> &reconstructed,
+void compress_b_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB> &reconstructed,
                        const size_t block_size)
 {
   const size_t half_block_size = block_size / 2;
@@ -44,13 +44,8 @@ void compress_b_x_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB
       reconstructed.pixel(x, y) = prediction + delta;
     }
   }
-}
 
-void compress_b_y_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB> &reconstructed,
-                       const size_t block_size)
-{
-  const size_t half_block_size = block_size / 2;
-  for (size_t x = 0; x < input.width(); x += block_size)
+  for (size_t x = 0; x < input.width(); x += half_block_size)
   {
     for (size_t y = half_block_size; y < input.height(); y += block_size)
     {
@@ -83,12 +78,11 @@ void compress_b(const bitmap<RGB> &input, bitmap<RGB> &deltas, size_t block_size
 
   for (size_t i = block_size; i >= 2; i /= 2)
   {
-    compress_b_x_pass(input, deltas, reconstructed, i);
-    compress_b_y_pass(input, deltas, reconstructed, i);
+    compress_b_pass(input, deltas, reconstructed, i);
   }
 }
 
-void decompress_b_x_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const size_t block_size)
+void decompress_b_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const size_t block_size)
 {
   const size_t half_block_size = block_size / 2;
   for (size_t x = half_block_size; x < output.width(); x += block_size)
@@ -102,12 +96,8 @@ void decompress_b_x_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const s
       output.pixel(x, y) = prediction + delta;
     }
   }
-}
 
-void decompress_b_y_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const size_t block_size)
-{
-  const size_t half_block_size = block_size / 2;
-  for (size_t x = 0; x < output.width(); x += block_size)
+  for (size_t x = 0; x < output.width(); x += half_block_size)
   {
     for (size_t y = half_block_size; y < output.height(); y += block_size)
     {
@@ -133,8 +123,7 @@ void decompress_b(const bitmap<RGB> &deltas, bitmap<RGB> &output, size_t block_s
 
   for (size_t i = block_size; i >= 2; i /= 2)
   {
-    decompress_b_x_pass(deltas, output, i);
-    decompress_b_y_pass(deltas, output, i);
+    decompress_b_pass(deltas, output, i);
   }
 }
 
