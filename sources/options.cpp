@@ -42,9 +42,9 @@ namespace {
     ;
 
    compression.add_options()
-    ("predictor,p",boost::program_options::value<std::string>(), "followed by 0 (default), A, B, C")
-    ("compress,c","Compresses a pnm file and produces a .s file (default)")
-    ("decompress,d","Decompresses a .s file and procudes a .pnm")
+    ("predictor,p",boost::program_options::value<std::string>(), "followed A, B, or C")
+    ("compress,c","Compresses a ppm file and produces a compressed file)")
+    ("decompress,d","Decompresses a file and procudes a .ppm")
     ;
 
 

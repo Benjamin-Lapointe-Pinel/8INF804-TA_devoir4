@@ -33,6 +33,16 @@ void compress_predict_from_previous(const bitmap<RGB> &input, bitmap<RGB> &recon
   reconstructed.pixel(x, y) = prediction + delta;
 }
 
+RGB decompress_predict_from_previous(bitmap<RGB> &output, const bitmap<RGB> &deltas, size_t x, size_t y, size_t px,
+                                     size_t py)
+{
+  RGB prediction = output.pixel(px, py);
+  RGB delta = deltas.pixel(x, y);
+
+  dequantize(delta);
+  return prediction + delta;
+}
+
 void compress_c(const bitmap<RGB> &input, bitmap<RGB> &deltas)
 {
   bitmap<RGB> reconstructed(input.width(), input.height());
@@ -70,16 +80,6 @@ void compress_c(const bitmap<RGB> &input, bitmap<RGB> &deltas)
       }
     }
   }
-}
-
-RGB decompress_predict_from_previous(bitmap<RGB> &output, const bitmap<RGB> &deltas, size_t x, size_t y, size_t px,
-                                     size_t py)
-{
-  RGB prediction = output.pixel(px, py);
-  RGB delta = deltas.pixel(x, y);
-
-  dequantize(delta);
-  return prediction + delta;
 }
 
 void decompress_c(const bitmap<RGB> &deltas, bitmap<RGB> &output)
@@ -126,15 +126,7 @@ void compress_b_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB> 
   {
     for (size_t y = 0; y < input.height(); y += block_size)
     {
-      RGB original = input.pixel(x, y);
-      RGB prediction = reconstructed.pixel(x - half_block_size, y);
-      RGB delta = original - prediction;
-
-      quantize(delta);
-      deltas.pixel(x, y) = delta;
-
-      dequantize(delta);
-      reconstructed.pixel(x, y) = prediction + delta;
+			compress_predict_from_previous(input, reconstructed, deltas, x, y, x - half_block_size, y);
     }
   }
 
@@ -142,15 +134,7 @@ void compress_b_pass(const bitmap<RGB> &input, bitmap<RGB> &deltas, bitmap<RGB> 
   {
     for (size_t y = half_block_size; y < input.height(); y += block_size)
     {
-      RGB original = input.pixel(x, y);
-      RGB prediction = reconstructed.pixel(x, y - half_block_size);
-      RGB delta = original - prediction;
-
-      quantize(delta);
-      deltas.pixel(x, y) = delta;
-
-      dequantize(delta);
-      reconstructed.pixel(x, y) = prediction + delta;
+			compress_predict_from_previous(input, reconstructed, deltas, x, y, x, y - half_block_size);
     }
   }
 }
@@ -182,11 +166,7 @@ void decompress_b_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const siz
   {
     for (size_t y = 0; y < output.height(); y += block_size)
     {
-      RGB prediction = output.pixel(x - half_block_size, y);
-      RGB delta = deltas.pixel(x, y);
-
-      dequantize(delta);
-      output.pixel(x, y) = prediction + delta;
+      output.pixel(x, y) = decompress_predict_from_previous(output, deltas, x, y, x - half_block_size, y);
     }
   }
 
@@ -194,11 +174,7 @@ void decompress_b_pass(const bitmap<RGB> &deltas, bitmap<RGB> &output, const siz
   {
     for (size_t y = half_block_size; y < output.height(); y += block_size)
     {
-      RGB prediction = output.pixel(x, y - half_block_size);
-      RGB delta = deltas.pixel(x, y);
-
-      dequantize(delta);
-      output.pixel(x, y) = prediction + delta;
+      output.pixel(x, y) = decompress_predict_from_previous(output, deltas, x, y, x, y - half_block_size);
     }
   }
 }
